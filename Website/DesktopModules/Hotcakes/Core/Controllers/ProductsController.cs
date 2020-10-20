@@ -30,6 +30,8 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Web.Mvc;
+using DotNetNuke.Common.Utilities;
+using DotNetNuke.Instrumentation;
 using DotNetNuke.Security;
 using Hotcakes.Commerce;
 using Hotcakes.Commerce.Analytics;
@@ -45,6 +47,7 @@ using Hotcakes.Common.Dnn;
 using Hotcakes.Modules.Core.Controllers.Shared;
 using Hotcakes.Modules.Core.Integration;
 using Hotcakes.Modules.Core.Models;
+using Hotcakes.Web.Logging;
 using Hotcakes.Web.Validation;
 
 namespace Hotcakes.Modules.Core.Controllers
@@ -52,6 +55,8 @@ namespace Hotcakes.Modules.Core.Controllers
     [Serializable]
     public class ProductsController : BaseStoreController
     {
+        private static readonly ILog Logger = LoggerSource.Instance.GetLogger(typeof(ProductsController));
+
         private PortalSecurity security = new PortalSecurity();
 
         #region Internal declarations
@@ -95,12 +100,14 @@ namespace Hotcakes.Modules.Core.Controllers
         // GET: /{*slug}
         public ActionResult Index(string slug)
         {
+            Logger.Error($"Slug: {slug}");
             if (!string.IsNullOrEmpty(slug))
             {
                 slug = Server.UrlDecode(slug);
             }
 
             var model = LoadProductModel(slug);
+            Logger.Error($"Model Is Null?: {model == null}");
 
             IndexSetup(model);
             LoadSelections(model);
@@ -109,6 +116,7 @@ namespace Hotcakes.Modules.Core.Controllers
             LogProductViewActivity(model);
 
             var viewName = GetViewName(model);
+            Logger.Error($"View: {viewName}");
             return View(viewName, model);
         }
 
@@ -181,10 +189,14 @@ namespace Hotcakes.Modules.Core.Controllers
         {
             var productBvin = Request.Form["productbvin"];
 
+            Logger.Error($"Product BVIN: {productBvin}");
+
             if (!string.IsNullOrEmpty(productBvin)) productBvin = security.InputFilter(productBvin.Trim(), PortalSecurity.FilterFlag.NoMarkup);
 
             var product = HccApp.CatalogServices.Products.FindWithCache(productBvin);
             var validateResult = new ProductValidateResponse();
+
+            Logger.Error($"Product is Null: {product == null}");
 
             if (product != null)
             {
@@ -228,6 +240,9 @@ namespace Hotcakes.Modules.Core.Controllers
         {
             CustomUrl customUrl;
             var product = HccApp.ParseProductBySlug(slug, out customUrl);
+
+            Logger.Error($"Product is Null: {product == null}");
+
             if (customUrl != null && !IsConcreteItemModule)
             {
                 var redirectUrl = HccUrlBuilder.RouteHccUrl(HccRoute.Product, new {slug = customUrl.RedirectToUrl});
@@ -238,14 +253,17 @@ namespace Hotcakes.Modules.Core.Controllers
             }
             if (product == null)
             {
+                Logger.Error(Localization.GetString("ProductNotFound"));
                 StoreExceptionHelper.ShowInfo(Localization.GetString("ProductNotFound"));
             }
             else if (product.Status != ProductStatus.Active)
             {
+                Logger.Error(Localization.GetString("ProductNotActive"));
                 StoreExceptionHelper.ShowInfo(Localization.GetString("ProductNotActive"));
             }
             else if (!HccApp.CatalogServices.TestProductAccess(product))
             {
+                Logger.Error(Localization.GetString("ProductNotEnoughPermission"));
                 StoreExceptionHelper.ShowInfo(Localization.GetString("ProductNotEnoughPermission"));
             }
 
@@ -280,6 +298,8 @@ namespace Hotcakes.Modules.Core.Controllers
             {
                 model.AuthorizedToEditCatalog = false;
             }
+
+            Logger.Error($"Product JSON: {product.ToJson()}");
 
             return model;
         }
@@ -511,6 +531,9 @@ namespace Hotcakes.Modules.Core.Controllers
 
         private void SetPageMetaData(Product prod)
         {
+            Logger.Error($"prod is null: {prod == null}");
+            Logger.Error($"IsConcreteItemModule: {IsConcreteItemModule}");
+
             if (!IsConcreteItemModule)
             {
                 var title = string.Empty;
